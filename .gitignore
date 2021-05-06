@@ -1,3 +1,4 @@
+
 # Prerequisites
 *.d
 
@@ -42,6 +43,7 @@
 *.idb
 *.pdb
 Debug/**
+.vs/**
 
 # Kernel Module Compile Results
 *.mod*
