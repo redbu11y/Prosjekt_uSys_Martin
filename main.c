@@ -32,13 +32,14 @@ void setup(){
 	PCICR = (1<<PCIE0); // Enable pin change mask 0 reg
 	PCMSK0 = (1<<PCINT0); // Enable Int on B0 in Pin change mask 0 register
 	EICRA = (1<<ISC01) | (1<<ISC00); // EICRA sense control, positive flank
-
+	
 
 	//ADC
 	ADCSRA |= (1<<ADEN) | (1<<ADPS0) | (1<<ADPS1) | (1<<ADPS2);
-	ADMUX = (1<<REFS0); //| (0<<REFS1) | (1<<ADLAR);
+	ADMUX = (1<<REFS0); //ADC on 0000
+	//ADMUX = (0<<MUX3)|(0<<MUX2)|(0<<MUX1)|(1<<MUX0); FOR ADC 2
 	
-	// 1hz timer
+	// timer prescaler
 	TCCR1A|=(1<<COM1A0)|(0<<WGM10); //CTC
 	TCCR1B|=(1<<CS12)|(0<<CS11)|(1<<CS10)|(0<<WGM13)|(1<<WGM12); //CTC and 1024 prescaler
 	
@@ -55,6 +56,7 @@ int main(void)
 	write_to_lcd("setup complete");	
 	uint8_t adc_result, adc_lownibble, adc_highnibble;
 	_delay_ms(1000);
+	int toggle = 0;
 	
     while (1) 
     {
@@ -62,12 +64,14 @@ int main(void)
 		_delay_ms(2);
 		//clear_lcd();
 		
-		char showruntime [16];
-		int val = read_ADC();
-		//write_to_lcd(itoa(val));
-		itoa (val,showruntime,10);
+		char adcVAL [16];
+
 		write_to_lcd("ADC Value 1: ");
 		printString("ADC Value 1: ");
+
+		int val = read_ADC();
+		itoa (val,adcVAL,10);
+
 		lcd_func(0xC0);	
 
 		write_to_lcd(itoa(val));
@@ -80,6 +84,8 @@ int main(void)
 		OCR1A = (F_CPU / val /2);
 		
 		_delay_ms(1000);
+
+		
 		
 		//Output
 		//ADC_LED(leds);
