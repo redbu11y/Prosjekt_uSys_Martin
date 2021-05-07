@@ -66,6 +66,9 @@ int main(void)
 
 		int val = read_ADC();
 		itoa (val,adcVAL,10);
+		
+		//Where going to use a temp sensor for a second ADC comperator, but i broke it and a normal potmeter has taken it's place as a backup.
+		//While not shown here, it's switched too by changing the ADMUX address bits.
 
 		lcd_func(0xC0);	
 
