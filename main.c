@@ -15,10 +15,6 @@
 #define RS PD2
 #define E PD3
 
-
-int distance;
-int timeout_timer;
-
 void setup(){
 	initUSART();
 	lcd_setup();
@@ -54,7 +50,6 @@ int main(void)
 	setup();
 	printString("setup complete \n");
 	write_to_lcd("setup complete");	
-	uint8_t adc_result, adc_lownibble, adc_highnibble;
 	_delay_ms(1000);
 	int toggle = 0;
 	
