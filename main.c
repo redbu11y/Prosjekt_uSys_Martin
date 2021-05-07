@@ -7,84 +7,107 @@
 #define F_CPU 16000000UL
 #include <avr/io.h>
 #include <util/delay.h>
+#include "USART.h"
+#include <avr/interrupt.h>
 
-#define LCD_PORTD PORTD 
-#define LCD_PIND DDRD
-#define RX PD0
-#define TX PD1
+
+//#define LCD_PORTB PORTB
+//#define LCD_PORTD PORTD
+//#define LCD_PINB DDRB
+//#define RS PD0
+//#define E PD1
 
 int distance;
 int timeout_timer;
 
+static volatile uint32_t first_reading = 0;
+static volatile uint32_t second_reading = 0;
+static volatile uint32_t duty_cycle = 0;
+
 void setup(){
-	//Setup timer
+	cli();
+	sei();
 	//Setup ADC
-	//Setup SPI/I2C
-	
+	DDRD |= (1<<6);
+	DDRB &= ~(1<<DDB0);
+	//Timer/Counter Control Register A
+	TCCR0B |= (1<<CS01); // Devided by 8 prescaler
+	TCCR0A = (1<<COM0A1)|(1<<COM0A0)|(1<<WGM01)|(1<<WGM00); //Set OC0A on Compare Match, clear OC0A at BOTTOM,(inverting mode). Fast PWM
+	TCCR1B = (1<<ICNC1)|(1<<ICES1)|(1<<CS11);
+	TIMSK1 |= (1<<ICIE1);
+	OCR0A = 235; //Set PMW pulse 10us
 	//USART
 }
 
+int ultrasonic_measure(){
+	
+	//32768uS = 65536 clock ticks for Timer 1 with prescaler = 8
+	int range = ((float)duty_cycle * 32768 / 65536) * 0.034 / 2;;
+	return range;
+}
+
+
 int main(void)
 {
-	lcd_setup();
-    /* Replace with your application code */
-	write_to_lcd("test");	//Begin writing at Line 1, Position 1
+	initUSART();
+	I2C_Setup();
+	_delay_ms(1000);
+	printString("USART Initialized \n");
+
+	//setup();
+	HCSR04_Init();
     while (1) 
     {
-			char showruntime [16];
-			itoa (timeout_timer,showruntime,10);
-			lcd_func(0xC0);		//Go to Line 2, Position 1
-			write_to_lcd("RUNTIME (s): ");
-			write_to_lcd(showruntime);
-			_delay_ms(1000);
-			timeout_timer++;
+		int range = ultrasonic_measure();
+		printString("range cm: ");
+		printWord(range);
+		//printString(range);
+		printString("\n");
+		I2C_Start();
+		//printString("I2C START \n");
+		I2C_Send(0x10);
+		I2C_Send("test");
+		//printString("I2C SEND \n");
+		I2C_Stop();
+		//printString("I2C STOP \n");
+		_delay_ms(2000);
+		
+		
+
     }
 }
 
-void lcd_setup(){
-	LCD_PIND = 0xFF;
-	_delay_ms(15);
-	lcd_func(0x02);		//4-Bit Control
-	lcd_func(0x28);     //Control Matrix @ 4-Bit
-	//lcd_func(0x0c);     //Disable Cursor
-	//lcd_func(0x06);     //Move Cursor
-	clear_lcd();
-	_delay_ms(2);
-}
 
-void lcd_func(unsigned char action){
-	LCD_PORTD = (LCD_PORTD & 0x0F) | (action & 0xF0);
-	LCD_PORTD &= ~(1<<RX);
-	lcd_helper(action);
-}
 
-void write_to_lcd(char *str){
-		int i;
-		for(i=0; str[i]!=0; i++)
-		{
-			LCD_PORTD = (LCD_PORTD & 0x0F) | (str[i] & 0xF0);
-			LCD_PORTD |= (1<<RX);
-			lcd_helper(str[i]);
-		}
+void I2C_Setup(){
+	TWBR = 32;
+	TWCR |= (1 << TWEN);
 }
-
-void lcd_helper(unsigned char _char){
-		LCD_PORTD |= (1<<TX);
-		_delay_us(1);
-		LCD_PORTD &= ~(1<<TX);
-		_delay_us(200);
-		LCD_PORTD = (LCD_PORTD & 0x0F) | (_char << 4); //Using 4 bits of LCD controller
-		LCD_PORTD |= (1<<TX);
-		_delay_us(1);
-		LCD_PORTD &= ~ (1<<TX);
-		_delay_ms(2);
-		//https://www.aeq-web.com/atmega328-4bit-16x2-lcd-display-amtel-studio-c/?lang=en
+void I2C_Start(){
+	TWCR = (1<<TWINT) | (1<<TWSTA) | (1<<TWEN);  // Step 1: Start TWI/I2C (Clear TWINT flag)
+	//while (!(TWCR & (1<<TWINT))){} //Step 2: Wait for TWINT to be set
+	loop_until_bit_is_set(TWCR, TWINT);
 }
-
-void clear_lcd(){
-	lcd_func(0x01); //Clear
-	_delay_ms(2);
-	lcd_func(0x80); //move to start
+int I2C_Read_High(){
+	TWCR = (1<<(TWINT) | (1<<TWEN) | (1<<TWEA));//TWI Enable Acknowledge Bit
+	//while (!(TWCR & (1<<TWINT))){}
+	loop_until_bit_is_set(TWCR, TWINT);
+	return (TWDR);
+}
+int I2C_Read_Low(){
+	TWCR = (1<<(TWINT) | (1<<TWEN));//TWI Enable Acknowledge Bit
+	//while (!(TWCR & (1<<TWINT))){}
+	loop_until_bit_is_set(TWCR, TWINT);
+	return (TWDR);
+}
+void I2C_Send(int DATA){
+	TWDR = DATA;
+	TWCR = (1<<TWINT) | (1<<TWEN);
+	//while (!(TWCR & (1<<TWINT))){}
+	loop_until_bit_is_set(TWCR, TWINT);
+}
+void I2C_Stop(){
+	TWCR = (1<<TWINT) | (1<<TWEN) | (1<<TWSTO); //Step 8: Stop I2C
 }
 
 
@@ -92,6 +115,22 @@ int read_ADC(){
 	return 1;
 }
 
-int read_ultrasonic_i2c(){
-	return 1;
+
+
+ISR(TIMER1_CAPT_vect){
+	if ((TCCR1B & (1<<ICES1)) == (1<<ICES1)){
+		first_reading = ICR1;
+	}
+	else{
+		second_reading = ICR1;
+	}
+	
+	if (first_reading != 0 && second_reading != 0){
+		duty_cycle = second_reading - first_reading;
+		first_reading = 0;
+		second_reading = 0;
+	}
+	
+	TCCR1B ^= (1<<ICES1); //toggle edge detection bit
+	TIFR1 = (1<<ICF1);//clear Input Capture Flag
 }
