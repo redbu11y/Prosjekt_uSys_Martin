@@ -8,10 +8,20 @@
 #include <avr/io.h>
 #include <util/delay.h>
 
+//LCD
 #define LCD_PORTD PORTD 
 #define LCD_PIND DDRD
 #define RX PD0
 #define TX PD1
+//I2C ultra sonic
+#define trig PB4
+#define echo PB5
+//Other
+#define Button PB1
+#define R_LED PB2
+#define G_LED PB3
+#define POTMETER PB6
+
 
 int distance;
 int timeout_timer;
@@ -40,6 +50,61 @@ int main(void)
 		timeout_timer++;
     }
 }
+
+/*
+void I2C_Init(void){
+	---TWCR = (1<<TWINT) | (1<<TWSTA) | (1<<TWEN); // Step 1: Start TWI/I2C (Clear TWINT flag)
+	---while (!(TWCR & (1<<TWINT))){} //Step 2: Wait for TWINT to be set (Possible use of interupt later)
+	if ((TWSR & 0xF8) != START){} //Step 3: Check if TWSR is equal to the start condition
+
+	TWDR = SLA_W; // Step 3.1: Assuming that the status code is as expected, the application must load SLA+W into TWDR.
+	TWCR = (1<<TWINT) | (1<<TWEN); //Step 4: When the address packet has been transmitted, the TWINT Flag in TWCR is set, and TWSR is updated with a status code indicating that the address packet has successfully been sent.
+	while(!(TWCR & (1<<TWINT))){} //Step 5: The application software should now examine the value of TWSR, to make sure that the address packet was successfully transmitted, and that the value of the ACK bit was as expected.
+	
+	if ((TWSR & 0xF8) != SLA_ACK){} //Step 6: When the data packet has been transmitted, the TWINT Flag in TWCR is set, and TWSR is updated with a status code indicating that the data packet has successfully been sent.
+	
+	---TWDR = DATA;
+	---TWCR = (1<<TWINT) | (1<<TWEN);
+	while (!(TWCR & (1<<TWINT))){}
+	if ((TWSR & 0xF8) != DATA_ACK){} // Step 7: The application software should now examine the value of TWSR, to make sure that the data packet was successfully transmitted
+	---TWCR = (1<<TWINT) | (1<<TWEN) | (1<<TWSTO); //Step 8: Stop I2C
+}
+
+*/
+
+void I2C_Setup(){
+	TWBR = 32; 
+	TWCR |= (1 << TWEN);
+}
+
+void I2C_Start(){
+	TWCR = (1<<TWINT) | (1<<TWSTA) | (1<<TWEN);  // Step 1: Start TWI/I2C (Clear TWINT flag)
+	while (!(TWCR & (1<<TWINT))){} //Step 2: Wait for TWINT to be set
+}
+
+int I2C_Read_High(){
+	TWCR = (1<<(TWINT) | (1<<TWEN) | (1<<TWEA));//TWI Enable Acknowledge Bit
+	while (!(TWCR & (1<<TWINT))){}
+	return (TWDR);
+}
+
+
+int I2C_Read_Low(){
+		TWCR = (1<<(TWINT) | (1<<TWEN));//TWI Enable Acknowledge Bit
+		while (!(TWCR & (1<<TWINT))){}
+		return (TWDR);
+}
+
+void I2C_Send(int DATA){
+	TWDR = DATA;
+	TWCR = (1<<TWINT) | (1<<TWEN);
+	while (!(TWCR & (1<<TWINT))){}
+}
+
+void I2C_Stop(){
+	TWCR = (1<<TWINT) | (1<<TWEN) | (1<<TWSTO); //Step 8: Stop I2C
+}
+
 
 void lcd_setup(){
 	LCD_PIND = 0xFF;
